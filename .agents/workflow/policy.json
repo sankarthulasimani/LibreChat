@@ -1,0 +1,314 @@
+{
+  "version": 1,
+  "loop_limits": {
+    "design_revisions": 2,
+    "plan_revisions": 2,
+    "fix_rounds": 3,
+    "max_work_packages": 6,
+    "max_files_per_work_package": 30
+  },
+  "stages": {
+    "design": {
+      "artifact": "design-brief.json",
+      "contract": "contracts/design-brief.schema.json",
+      "reviewed_by": "architect",
+      "write_scope": [".agents/runs/**"]
+    },
+    "architect": {
+      "artifact": "architecture-plan.json",
+      "contract": "contracts/architecture-plan.schema.json",
+      "reviewed_by": "dev",
+      "write_scope": [".agents/runs/**", "CONTEXT.md"]
+    },
+    "dev": {
+      "artifact": "dev-report.*.json",
+      "contract": "contracts/dev-report.schema.json",
+      "reviewed_by": "test",
+      "write_scope": [
+        "api/**",
+        "client/**",
+        "packages/**",
+        "config/**",
+        "e2e/**",
+        "librechat.example.yaml",
+        "CONTEXT.md",
+        ".agents/runs/**"
+      ]
+    },
+    "test": {
+      "artifact": "test-report.json",
+      "contract": "contracts/test-report.schema.json",
+      "reviewed_by": "orchestrator",
+      "write_scope": [
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.test.{js,jsx,ts,tsx,mjs,mts}",
+        "**/*.spec.{js,jsx,ts,tsx}",
+        "e2e/specs/**",
+        "e2e/fixtures/**",
+        ".agents/runs/**"
+      ]
+    }
+  },
+  "immutable_paths": [
+    ".agents/workflow/**",
+    ".claude/**",
+    ".devin/**",
+    ".github/**",
+    ".husky/**",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "scripts/**",
+    "eslint.config.mjs",
+    "**/.env",
+    "**/.env.*",
+    "!**/.env.example"
+  ],
+  "protected_paths": [
+    "package.json",
+    "package-lock.json",
+    "bun.lock",
+    "**/package.json",
+    "turbo.json",
+    "Dockerfile*",
+    "*compose*.yml",
+    "helm/**",
+    "client/src/locales/**",
+    "!client/src/locales/en/**"
+  ],
+  "diff_rules": [
+    {
+      "id": "no-secrets",
+      "severity": "error",
+      "files": ["**"],
+      "pattern": "(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----)",
+      "message": "Credential-shaped literal added. Secrets never enter the repository."
+    },
+    {
+      "id": "no-any",
+      "severity": "error",
+      "files": ["**/*.{ts,tsx,mts}"],
+      "pattern": "(:\\s*any\\b|<any>|\\bas any\\b|any\\[\\])",
+      "message": "CLAUDE.md > Type Safety: never use `any`."
+    },
+    {
+      "id": "no-double-cast",
+      "severity": "error",
+      "files": ["**/*.{ts,tsx,mts}"],
+      "pattern": "as unknown as",
+      "message": "CLAUDE.md > Type Safety: `as unknown as T` hides a missing type."
+    },
+    {
+      "id": "no-ts-suppression",
+      "severity": "error",
+      "files": ["**/*.{ts,tsx,mts}"],
+      "pattern": "@ts-(ignore|nocheck)",
+      "message": "Diagnostics must be fixed, not suppressed."
+    },
+    {
+      "id": "no-focused-tests",
+      "severity": "error",
+      "files": ["**"],
+      "pattern": "\\b(it|test|describe)\\.only\\(",
+      "message": "Focused tests silently disable the rest of the suite."
+    },
+    {
+      "id": "no-raw-palette",
+      "severity": "error",
+      "files": ["client/src/**/*.{ts,tsx}", "packages/client/src/**/*.{ts,tsx}"],
+      "pattern": "\\b(bg|text|border|ring|fill|stroke|outline|divide|from|to|via)-(red|blue|green|gray|slate|zinc|neutral|stone|orange|amber|yellow|lime|emerald|teal|cyan|sky|indigo|violet|purple|fuchsia|pink|rose)-\\d{2,3}\\b",
+      "message": "CLAUDE.md > Theming: use semantic theme roles, not raw palette utilities."
+    },
+    {
+      "id": "no-mongoose-outside-schemas",
+      "severity": "error",
+      "files": ["client/**", "packages/data-provider/**", "packages/client/**"],
+      "pattern": "from ['\"]mongoose['\"]|require\\(['\"]mongoose['\"]\\)",
+      "message": "CLAUDE.md > Workspace Boundaries: database contracts stay in packages/data-schemas."
+    },
+    {
+      "id": "no-hardcoded-color",
+      "severity": "warn",
+      "files": ["client/src/**/*.{ts,tsx}", "packages/client/src/**/*.{ts,tsx}"],
+      "pattern": "#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsla?\\(",
+      "message": "Hard-coded color in a component; prefer semantic theme roles."
+    },
+    {
+      "id": "new-state-is-jotai",
+      "severity": "warn",
+      "files": ["client/src/**/*.{ts,tsx}"],
+      "pattern": "\\b(atom|atomFamily|selector|selectorFamily)\\(\\{",
+      "message": "Recoil-style atom definition added. CLAUDE.md > Client State Ownership: new state is Jotai."
+    },
+    {
+      "id": "api-is-wiring",
+      "severity": "warn",
+      "files": ["api/**/*.js", "!api/**/*.spec.js", "!api/**/*.test.js", "!api/**/__tests__/**"],
+      "pattern": "^\\s*(if|else|for|while|switch|try)\\b",
+      "message": "Control flow added under /api. CLAUDE.md: /api holds wiring; move behavior to packages/api."
+    },
+    {
+      "id": "no-dynamic-import",
+      "severity": "warn",
+      "files": ["api/**", "client/src/**", "packages/*/src/**"],
+      "pattern": "\\bimport\\(",
+      "message": "CLAUDE.md > Structure: no dynamic imports unless absolutely necessary."
+    },
+    {
+      "id": "no-console",
+      "severity": "warn",
+      "files": ["client/src/**", "packages/*/src/**", "!**/*.{test,spec}.*", "!**/__tests__/**"],
+      "pattern": "\\bconsole\\.(log|debug)\\(",
+      "message": "Use the project logger, not console."
+    },
+    {
+      "id": "no-lint-suppression",
+      "severity": "warn",
+      "files": ["**/*.{js,jsx,ts,tsx,mjs,mts}"],
+      "pattern": "eslint-disable",
+      "message": "Lint suppression added; justify it in the dev report deviations."
+    },
+    {
+      "id": "no-skipped-tests",
+      "severity": "warn",
+      "files": ["**/*.{test,spec}.*", "**/__tests__/**", "e2e/**"],
+      "pattern": "\\b(it|test|describe)\\.skip\\(|\\bxit\\(|\\bxdescribe\\(",
+      "message": "Skipped test added; the test report must explain it."
+    }
+  ],
+  "rubrics": {
+    "design": {
+      "threshold": 0.75,
+      "criteria": [
+        {
+          "id": "problem_clarity",
+          "critical": true,
+          "description": "The problem, who it affects and what triggers it are stated without prescribing a solution."
+        },
+        {
+          "id": "testable_criteria",
+          "critical": true,
+          "description": "Every acceptance criterion is a Given/When/Then a test can decide."
+        },
+        {
+          "id": "scope_boundaries",
+          "critical": false,
+          "description": "Goals and non-goals leave no ambiguity about what ships."
+        },
+        {
+          "id": "observable_states",
+          "critical": false,
+          "description": "Loading, empty, success, error, cancel/retry and restored-session states are specified or ruled out with a reason."
+        },
+        {
+          "id": "compatibility",
+          "critical": true,
+          "description": "Defaults, stored data, configuration and mixed-version behavior are preserved or the change is called out."
+        },
+        {
+          "id": "config_levers",
+          "critical": false,
+          "description": "Every new limit, timeout, toggle or capability is named as a librechat.yaml lever with a default reproducing today's behavior."
+        }
+      ]
+    },
+    "architect": {
+      "threshold": 0.75,
+      "criteria": [
+        {
+          "id": "boundary_compliance",
+          "critical": true,
+          "description": "Behavior lives in packages/api, DB contracts in data-schemas, shared types in data-provider, levers on configSchema, dependencies injected."
+        },
+        {
+          "id": "traceability",
+          "critical": true,
+          "description": "Every acceptance criterion maps to a work package and at least one named test."
+        },
+        {
+          "id": "feasibility",
+          "critical": true,
+          "description": "Paths, interfaces and sequencing are implementable as written against the current code."
+        },
+        {
+          "id": "module_depth",
+          "critical": false,
+          "description": "Interfaces are small relative to the behavior behind them; seams are placed where tests can use them."
+        },
+        {
+          "id": "incremental_packages",
+          "critical": false,
+          "description": "Work packages are independently verifiable with non-overlapping write scopes."
+        },
+        {
+          "id": "risk_and_rollback",
+          "critical": false,
+          "description": "Risks carry mitigations and the change can be rolled back or disabled by config."
+        }
+      ]
+    },
+    "dev": {
+      "threshold": 0.8,
+      "criteria": [
+        {
+          "id": "criteria_met",
+          "critical": true,
+          "description": "The observable behavior satisfies every acceptance criterion in scope."
+        },
+        {
+          "id": "guardrails_respected",
+          "critical": true,
+          "description": "No scope, boundary, typing or styling guardrail is violated, and deviations are declared."
+        },
+        {
+          "id": "test_quality",
+          "critical": true,
+          "description": "Tests exercise real logic (mongodb-memory-server, real SDK exports) and would fail without the change."
+        },
+        {
+          "id": "code_style",
+          "critical": false,
+          "description": "Follows CLAUDE.md code style: never-nesting, single-pass loops, import order, localized strings."
+        },
+        {
+          "id": "minimal_diff",
+          "critical": false,
+          "description": "The change is the smallest consistent with existing patterns; no unrelated edits."
+        },
+        {
+          "id": "observable_experience",
+          "critical": false,
+          "description": "Loading, empty, error and retry paths behave as designed."
+        }
+      ]
+    }
+  },
+  "workspaces": {
+    "api": { "path": "api", "typecheck": null, "test": "cd api && npx jest {pattern}" },
+    "packages/api": {
+      "path": "packages/api",
+      "typecheck": "cd packages/api && npx tsc --noEmit",
+      "test": "cd packages/api && npx jest {pattern}"
+    },
+    "packages/data-schemas": {
+      "path": "packages/data-schemas",
+      "typecheck": "cd packages/data-schemas && npx tsc --noEmit",
+      "test": "cd packages/data-schemas && npx jest {pattern}"
+    },
+    "packages/data-provider": {
+      "path": "packages/data-provider",
+      "typecheck": "cd packages/data-provider && npx tsc --noEmit",
+      "test": "cd packages/data-provider && npx jest {pattern}"
+    },
+    "packages/client": {
+      "path": "packages/client",
+      "typecheck": "cd packages/client && npx tsc --noEmit",
+      "test": "cd packages/client && npx jest {pattern}"
+    },
+    "client": {
+      "path": "client",
+      "typecheck": "cd client && npm run typecheck",
+      "test": "cd client && npx jest {pattern}"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "run_id": "example-composer-counter",
+  "title": "Character counter in the chat composer",
+  "problem": "Users pasting long prompts only learn they exceeded the model's input limit after the request fails, losing time and sometimes the draft. It affects every endpoint whose model spec defines a max input length and is triggered by typing or pasting past that length.",
+  "users_affected": [
+    "Chat users on endpoints with a configured max input length",
+    "Operators who tune model limits in librechat.yaml"
+  ],
+  "surfaces": ["frontend", "config", "data-provider"],
+  "goals": [
+    "Show remaining characters while composing once 80% of the limit is used",
+    "Block send and explain why when the limit is exceeded"
+  ],
+  "non_goals": ["Token-accurate counting", "Changing server-side truncation"],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "kind": "functional",
+      "given": "interface.composerCounter.enabled is true and the model limit is 1000 characters",
+      "when": "the draft reaches 800 characters",
+      "then": "a counter shows the remaining 200 characters"
+    },
+    {
+      "id": "AC-2",
+      "kind": "functional",
+      "given": "the counter is enabled",
+      "when": "the draft exceeds the limit",
+      "then": "the send button is disabled and the counter states the overflow"
+    },
+    {
+      "id": "AC-3",
+      "kind": "compatibility",
+      "given": "librechat.yaml does not set interface.composerCounter",
+      "when": "the app loads",
+      "then": "no counter renders and sending behaves exactly as today"
+    },
+    {
+      "id": "AC-4",
+      "kind": "a11y",
+      "given": "the counter is visible",
+      "when": "the remaining count crosses 0",
+      "then": "a polite live region announces the overflow once and the counter text is localized"
+    }
+  ],
+  "ux_states": {
+    "loading": "n/a: the counter derives from local draft state and already-loaded startup config",
+    "empty": "No counter below 80% of the limit, including an empty draft",
+    "success": "Counter shows remaining characters in the muted text role",
+    "error": "Over the limit the counter uses the destructive text role and send is disabled",
+    "cancel_retry": "Deleting text below the limit re-enables send immediately",
+    "restored_session": "A restored draft recomputes the counter on mount"
+  },
+  "config_levers": [
+    {
+      "name": "interface.composerCounter.enabled",
+      "purpose": "Operators opt in to the counter",
+      "default": "false"
+    }
+  ],
+  "compatibility": "Off by default, so existing deployments and stored drafts are unaffected; older clients ignore the new interface field.",
+  "assumptions": ["Model max input length is already exposed to the client in startup config"],
+  "blocking_questions": [],
+  "risk": "low"
+}

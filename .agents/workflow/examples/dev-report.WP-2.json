@@ -1,0 +1,86 @@
+{
+  "run_id": "example-composer-counter",
+  "work_package": "WP-2",
+  "round": 0,
+  "plan_review": {
+    "verdict": "accept",
+    "scores": [
+      {
+        "criterion": "boundary_compliance",
+        "score": 2,
+        "note": "Lever on configSchema; component takes props."
+      },
+      {
+        "criterion": "traceability",
+        "score": 2,
+        "note": "All four criteria mapped to tests."
+      },
+      {
+        "criterion": "feasibility",
+        "score": 2,
+        "note": "Paths exist and the limit is already in startup config."
+      },
+      {
+        "criterion": "module_depth",
+        "score": 2,
+        "note": "Two-prop interface."
+      },
+      {
+        "criterion": "incremental_packages",
+        "score": 2,
+        "note": "WP-1 verifiable alone."
+      },
+      {
+        "criterion": "risk_and_rollback",
+        "score": 2,
+        "note": "Config-off rollback."
+      }
+    ],
+    "required_changes": []
+  },
+  "branch": "devin/example-composer-counter",
+  "head_sha": "5d6e7f8",
+  "files_changed": [
+    "client/src/components/Chat/Input/CharacterCounter.tsx",
+    "client/src/components/Chat/Input/ChatForm.tsx",
+    "client/src/components/Chat/Input/__tests__/CharacterCounter.spec.tsx",
+    "client/src/locales/en/translation.json"
+  ],
+  "summary": "Adds CharacterCounter and gates send in ChatForm.",
+  "deviations": [],
+  "checks": [
+    {
+      "command": "cd client && npm run typecheck",
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "command": "cd client && npx jest CharacterCounter",
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "command": "npm run static-checks",
+      "result": "pass",
+      "note": ""
+    }
+  ],
+  "criteria_status": [
+    {
+      "id": "AC-1",
+      "status": "implemented",
+      "evidence": "CharacterCounter.spec.tsx: 'shows remaining at 80%'"
+    },
+    {
+      "id": "AC-2",
+      "status": "implemented",
+      "evidence": "CharacterCounter.spec.tsx: 'disables send over the limit'"
+    },
+    {
+      "id": "AC-4",
+      "status": "implemented",
+      "evidence": "CharacterCounter.spec.tsx: 'announces overflow once'"
+    }
+  ],
+  "findings_addressed": []
+}

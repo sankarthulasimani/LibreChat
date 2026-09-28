@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArchitecturePlan",
+  "description": "Output of the Architect agent: where the change lives, the interfaces it adds, and the work packages the Dev agent executes.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "design_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["accept", "revise"]
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "criterion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["criterion", "score", "note"]
+          },
+          "minItems": 1
+        },
+        "required_changes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["verdict", "scores", "required_changes"],
+      "description": "Rubric scores for the upstream artifact. Criteria ids come from policy.json rubrics.<upstream stage>. verdict must be 'revise' when any critical criterion scores 0 or the normalized total is below the rubric threshold."
+    },
+    "approach": {
+      "type": "string",
+      "minLength": 1
+    },
+    "alternatives_considered": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "option": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rejected_because": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["option", "rejected_because"]
+      },
+      "minItems": 1
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "workspace": {
+            "type": "string",
+            "enum": [
+              "api",
+              "packages/api",
+              "packages/data-schemas",
+              "packages/data-provider",
+              "packages/client",
+              "client",
+              "config",
+              "e2e"
+            ]
+          },
+          "change": {
+            "type": "string",
+            "enum": ["new", "modify"]
+          },
+          "responsibility": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["path", "workspace", "change", "responsibility"]
+      },
+      "minItems": 1
+    },
+    "interfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "signature": {
+            "type": "string",
+            "minLength": 1
+          },
+          "invariants": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": ["name", "location", "signature", "invariants"]
+      }
+    },
+    "config_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schema_location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["field", "schema_location", "default"]
+      }
+    },
+    "data_changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "migration_required": {
+          "type": "boolean"
+        },
+        "stored_data_compatibility": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["migration_required", "stored_data_compatibility"]
+    },
+    "work_packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^WP-[0-9]+$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^WP-[0-9]+$"
+            }
+          },
+          "write_scope": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "protected_overrides": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["path", "reason"]
+            }
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^AC-[0-9]+$"
+            },
+            "minItems": 1
+          },
+          "tests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["unit", "integration", "e2e"]
+                },
+                "covers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^AC-[0-9]+$"
+                  },
+                  "minItems": 1
+                }
+              },
+              "required": ["path", "kind", "covers"]
+            },
+            "minItems": 1
+          },
+          "typecheck_workspaces": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "depends_on",
+          "write_scope",
+          "protected_overrides",
+          "acceptance_criteria",
+          "tests",
+          "typecheck_workspaces"
+        ]
+      },
+      "minItems": 1
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "risk": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mitigation": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["risk", "mitigation"]
+      }
+    },
+    "rollback": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "run_id",
+    "design_review",
+    "approach",
+    "alternatives_considered",
+    "modules",
+    "interfaces",
+    "config_fields",
+    "data_changes",
+    "work_packages",
+    "invariants",
+    "risks",
+    "rollback"
+  ]
+}

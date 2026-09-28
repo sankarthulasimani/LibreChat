@@ -1,0 +1,27 @@
+{
+  "provider": "azure_devops",
+  "repo": "sankarthulasimani/LibreChat",
+  "base": "main",
+  "azure_devops": {
+    "org_url_env": "ADO_ORG_URL",
+    "project_env": "ADO_PROJECT",
+    "pat_env": "ADO_PAT",
+    "work_item_types": ["User Story", "Product Backlog Item", "Bug", "Task"],
+    "area_path": null,
+    "fields": {
+      "title": "System.Title",
+      "description": "System.Description",
+      "acceptance_criteria": "Microsoft.VSTS.Common.AcceptanceCriteria",
+      "repro_steps": "Microsoft.VSTS.TCM.ReproSteps"
+    }
+  },
+  "trigger": "tag",
+  "markers": {
+    "ready": "AI_Ready",
+    "in_progress": "AI_In_Progress",
+    "review": "AI_Review",
+    "blocked": "AI_Blocked"
+  },
+  "state_moves": {},
+  "tag": "software-factory"
+}
