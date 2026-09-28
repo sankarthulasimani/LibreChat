@@ -1,0 +1,139 @@
+{
+  "run_id": "example-composer-counter",
+  "design_review": {
+    "verdict": "accept",
+    "scores": [
+      {
+        "criterion": "problem_clarity",
+        "score": 2,
+        "note": "Trigger and audience are explicit."
+      },
+      {
+        "criterion": "testable_criteria",
+        "score": 2,
+        "note": "Each criterion has a decidable outcome."
+      },
+      {
+        "criterion": "scope_boundaries",
+        "score": 2,
+        "note": "Token counting explicitly excluded."
+      },
+      {
+        "criterion": "observable_states",
+        "score": 2,
+        "note": "All six states addressed."
+      },
+      {
+        "criterion": "compatibility",
+        "score": 2,
+        "note": "Default-off preserves behavior."
+      },
+      {
+        "criterion": "config_levers",
+        "score": 1,
+        "note": "Threshold percentage is fixed at 80%; acceptable for v1."
+      }
+    ],
+    "required_changes": []
+  },
+  "approach": "Add interface.composerCounter to configSchema in data-provider, then a CharacterCounter component composed from @librechat/client text primitives, fed by ChatForm with the draft length and limit as props.",
+  "alternatives_considered": [
+    {
+      "option": "Count inside the textarea hook",
+      "rejected_because": "Couples counting to input handling and cannot be tested in isolation."
+    }
+  ],
+  "modules": [
+    {
+      "path": "packages/data-provider/src/config.ts",
+      "workspace": "packages/data-provider",
+      "change": "modify",
+      "responsibility": "composerCounter field on interfaceSchema with default false"
+    },
+    {
+      "path": "client/src/components/Chat/Input/CharacterCounter.tsx",
+      "workspace": "client",
+      "change": "new",
+      "responsibility": "Pure presentational counter with live region"
+    },
+    {
+      "path": "client/src/components/Chat/Input/ChatForm.tsx",
+      "workspace": "client",
+      "change": "modify",
+      "responsibility": "Pass draft length and limit; gate send"
+    },
+    {
+      "path": "client/src/locales/en/translation.json",
+      "workspace": "client",
+      "change": "modify",
+      "responsibility": "com_ui_chars_remaining and com_ui_chars_over keys"
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "CharacterCounter",
+      "location": "client/src/components/Chat/Input/CharacterCounter.tsx",
+      "signature": "({ length, limit }: { length: number; limit: number }) => JSX.Element | null",
+      "invariants": ["Renders null below 80% of limit", "Never reads global store"]
+    }
+  ],
+  "config_fields": [
+    {
+      "field": "interface.composerCounter.enabled",
+      "schema_location": "packages/data-provider/src/config.ts",
+      "default": "false"
+    }
+  ],
+  "data_changes": {
+    "migration_required": false,
+    "stored_data_compatibility": "No stored data changes."
+  },
+  "work_packages": [
+    {
+      "id": "WP-1",
+      "title": "Config lever",
+      "depends_on": [],
+      "write_scope": ["packages/data-provider/src/config.ts", "packages/data-provider/specs/**"],
+      "protected_overrides": [],
+      "acceptance_criteria": ["AC-3"],
+      "tests": [
+        {
+          "path": "packages/data-provider/specs/config.spec.ts",
+          "kind": "unit",
+          "covers": ["AC-3"]
+        }
+      ],
+      "typecheck_workspaces": ["packages/data-provider"]
+    },
+    {
+      "id": "WP-2",
+      "title": "Counter component and send gating",
+      "depends_on": ["WP-1"],
+      "write_scope": [
+        "client/src/components/Chat/Input/**",
+        "client/src/locales/en/translation.json"
+      ],
+      "protected_overrides": [],
+      "acceptance_criteria": ["AC-1", "AC-2", "AC-4"],
+      "tests": [
+        {
+          "path": "client/src/components/Chat/Input/__tests__/CharacterCounter.spec.tsx",
+          "kind": "unit",
+          "covers": ["AC-1", "AC-2", "AC-4"]
+        }
+      ],
+      "typecheck_workspaces": ["client"]
+    }
+  ],
+  "invariants": [
+    "Default config reproduces today's composer exactly",
+    "Counter is derived state; nothing is persisted"
+  ],
+  "risks": [
+    {
+      "risk": "Re-render cost on every keystroke",
+      "mitigation": "Counter receives primitive props and is memoized"
+    }
+  ],
+  "rollback": "Leave interface.composerCounter.enabled false or revert the PR; no data to migrate."
+}

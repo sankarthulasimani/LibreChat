@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DevReport",
+  "description": "Output of the Dev agent for one work package (or one fix round).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "work_package": {
+      "type": "string",
+      "pattern": "^WP-[0-9]+$"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "plan_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": ["accept", "revise"]
+        },
+        "scores": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "criterion": {
+                "type": "string",
+                "minLength": 1
+              },
+              "score": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["criterion", "score", "note"]
+          },
+          "minItems": 1
+        },
+        "required_changes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["verdict", "scores", "required_changes"],
+      "description": "Rubric scores for the upstream artifact. Criteria ids come from policy.json rubrics.<upstream stage>. verdict must be 'revise' when any critical criterion scores 0 or the normalized total is below the rubric threshold."
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "files_changed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deviations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "what": {
+            "type": "string",
+            "minLength": 1
+          },
+          "why": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["what", "why"]
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "result": {
+            "type": "string",
+            "enum": ["pass", "fail", "not_run"]
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": ["command", "result", "note"]
+      },
+      "minItems": 1
+    },
+    "criteria_status": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^AC-[0-9]+$"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["implemented", "partial", "not_started"]
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["id", "status", "evidence"]
+      },
+      "minItems": 1
+    },
+    "findings_addressed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "finding": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resolution": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["finding", "resolution"]
+      }
+    }
+  },
+  "required": [
+    "run_id",
+    "work_package",
+    "round",
+    "plan_review",
+    "branch",
+    "head_sha",
+    "files_changed",
+    "summary",
+    "deviations",
+    "checks",
+    "criteria_status",
+    "findings_addressed"
+  ]
+}

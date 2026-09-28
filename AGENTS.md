@@ -117,3 +117,10 @@ consumer sits outside the feature you are changing, leave that atom on Recoil an
 them in is what lets a feature move to its own workspace later without a rewrite, and it keeps the
 Jotai conversion scoped to the state a feature owns. See the detailed policy in `CLAUDE.md` under
 “Client State Ownership”.
+
+## Autonomous delivery workflow
+
+Agent-driven changes can run as Design → Architect → Dev → Test stages defined in
+`.agents/workflow/` (see its `README.md`). Each stage's work definition, guardrails and evals are
+in `.agents/workflow/roles/`; the gates run with `node scripts/agent-workflow.mts`. When acting as
+a workflow stage, the stage's write scope and guardrails apply on top of this file.

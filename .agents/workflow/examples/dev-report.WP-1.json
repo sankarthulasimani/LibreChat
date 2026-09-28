@@ -1,0 +1,74 @@
+{
+  "run_id": "example-composer-counter",
+  "work_package": "WP-1",
+  "round": 0,
+  "plan_review": {
+    "verdict": "accept",
+    "scores": [
+      {
+        "criterion": "boundary_compliance",
+        "score": 2,
+        "note": "Lever on configSchema; component takes props."
+      },
+      {
+        "criterion": "traceability",
+        "score": 2,
+        "note": "All four criteria mapped to tests."
+      },
+      {
+        "criterion": "feasibility",
+        "score": 2,
+        "note": "Paths exist and the limit is already in startup config."
+      },
+      {
+        "criterion": "module_depth",
+        "score": 2,
+        "note": "Two-prop interface."
+      },
+      {
+        "criterion": "incremental_packages",
+        "score": 2,
+        "note": "WP-1 verifiable alone."
+      },
+      {
+        "criterion": "risk_and_rollback",
+        "score": 2,
+        "note": "Config-off rollback."
+      }
+    ],
+    "required_changes": []
+  },
+  "branch": "devin/example-composer-counter",
+  "head_sha": "1a2b3c4",
+  "files_changed": [
+    "packages/data-provider/src/config.ts",
+    "packages/data-provider/specs/config.spec.ts"
+  ],
+  "summary": "Adds interface.composerCounter.enabled (default false).",
+  "deviations": [],
+  "checks": [
+    {
+      "command": "cd packages/data-provider && npx tsc --noEmit",
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "command": "cd packages/data-provider && npx jest specs/config.spec.ts",
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "command": "npm run static-checks",
+      "result": "pass",
+      "note": ""
+    }
+  ],
+  "criteria_status": [
+    {
+      "id": "AC-3",
+      "status": "implemented",
+      "evidence": "config.spec.ts: 'composerCounter defaults to disabled'"
+    }
+  ],
+  "findings_addressed": []
+}

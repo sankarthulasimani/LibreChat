@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DesignBrief",
+  "description": "Output of the Design agent: the problem and the observable behavior that must ship, with no implementation decisions.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "problem": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What is broken or missing today, for whom, and what triggers it."
+    },
+    "users_affected": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["frontend", "backend", "data-provider", "data-schemas", "config", "e2e", "docs"]
+      },
+      "minItems": 1
+    },
+    "goals": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^AC-[0-9]+$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["functional", "ux", "a11y", "i18n", "performance", "security", "compatibility"]
+          },
+          "given": {
+            "type": "string",
+            "minLength": 1
+          },
+          "when": {
+            "type": "string",
+            "minLength": 1
+          },
+          "then": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["id", "kind", "given", "when", "then"]
+      },
+      "minItems": 1
+    },
+    "ux_states": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "loading": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected behavior, or 'n/a: <reason>'."
+        },
+        "empty": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected behavior, or 'n/a: <reason>'."
+        },
+        "success": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected behavior, or 'n/a: <reason>'."
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected behavior, or 'n/a: <reason>'."
+        },
+        "cancel_retry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected behavior, or 'n/a: <reason>'."
+        },
+        "restored_session": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Expected behavior, or 'n/a: <reason>'."
+        }
+      },
+      "required": ["loading", "empty", "success", "error", "cancel_retry", "restored_session"]
+    },
+    "config_levers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Must reproduce today's behavior."
+          }
+        },
+        "required": ["name", "purpose", "default"]
+      }
+    },
+    "compatibility": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Effect on defaults, stored data, librechat.yaml and mixed-version deployments."
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "blocking_questions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Questions only a human can answer. Non-empty halts the workflow for escalation."
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    }
+  },
+  "required": [
+    "run_id",
+    "title",
+    "problem",
+    "users_affected",
+    "surfaces",
+    "goals",
+    "non_goals",
+    "acceptance_criteria",
+    "ux_states",
+    "config_levers",
+    "compatibility",
+    "assumptions",
+    "blocking_questions",
+    "risk"
+  ]
+}

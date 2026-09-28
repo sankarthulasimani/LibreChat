@@ -1,0 +1,94 @@
+{
+  "run_id": "example-composer-counter",
+  "head_sha": "5d6e7f8",
+  "implementation_review": {
+    "verdict": "accept",
+    "scores": [
+      {
+        "criterion": "criteria_met",
+        "score": 2,
+        "note": "All criteria observed in tests and manual run."
+      },
+      {
+        "criterion": "guardrails_respected",
+        "score": 2,
+        "note": "guard dev and guard test clean."
+      },
+      {
+        "criterion": "test_quality",
+        "score": 2,
+        "note": "Renders the real component with layout-test-utils."
+      },
+      {
+        "criterion": "code_style",
+        "score": 2,
+        "note": "Imports sorted; strings localized."
+      },
+      {
+        "criterion": "minimal_diff",
+        "score": 2,
+        "note": "Four files in WP-2."
+      },
+      {
+        "criterion": "observable_experience",
+        "score": 1,
+        "note": "Restored-draft path covered by a unit test only."
+      }
+    ],
+    "required_changes": []
+  },
+  "verdict": "pass",
+  "criteria_results": [
+    {
+      "id": "AC-1",
+      "status": "pass",
+      "evidence": "cd client && npx jest CharacterCounter -> 'shows remaining at 80%' passed",
+      "note": ""
+    },
+    {
+      "id": "AC-2",
+      "status": "pass",
+      "evidence": "cd client && npx jest CharacterCounter -> 'disables send over the limit' passed",
+      "note": ""
+    },
+    {
+      "id": "AC-3",
+      "status": "pass",
+      "evidence": "cd packages/data-provider && npx jest specs/config.spec.ts -> 'composerCounter defaults to disabled' passed",
+      "note": ""
+    },
+    {
+      "id": "AC-4",
+      "status": "pass",
+      "evidence": "CharacterCounter.spec.tsx 'announces overflow once' asserts role=status and localized text",
+      "note": ""
+    }
+  ],
+  "tests_added": ["client/src/components/Chat/Input/__tests__/CharacterCounter.restore.spec.tsx"],
+  "checks": [
+    {
+      "command": "node scripts/agent-workflow.mts guard dev --against origin/dev --head 5d6e7f8 --run .agents/runs/example-composer-counter",
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "command": "cd client && npm run typecheck",
+      "result": "pass",
+      "note": ""
+    },
+    {
+      "command": "npm run static-checks -- --against origin/dev",
+      "result": "pass",
+      "note": ""
+    }
+  ],
+  "findings": [
+    {
+      "severity": "minor",
+      "criterion": "AC-1",
+      "location": "client/src/components/Chat/Input/CharacterCounter.tsx",
+      "description": "80% threshold is a literal; consider a config field in a follow-up.",
+      "repro": "Read the component."
+    }
+  ]
+}

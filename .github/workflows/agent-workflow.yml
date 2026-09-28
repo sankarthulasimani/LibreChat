@@ -1,0 +1,38 @@
+name: Agent Workflow
+
+on:
+  pull_request:
+    paths:
+      - '.agents/workflow/**'
+      - '.devin/skills/autonomous-workflow/**'
+      - 'scripts/agent-workflow.mts'
+      - 'scripts/agent-workflow.test.mts'
+      - '.github/workflows/agent-workflow.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agent-workflow:
+    name: Policy, contracts and gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Use Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+      - name: Gate unit tests
+        run: node --test scripts/agent-workflow.test.mts
+      - name: Policy, contracts and example run
+        run: node scripts/agent-workflow.mts check-policy
+      - name: Example run passes every stage gate
+        run: node scripts/agent-workflow.mts validate all --run .agents/workflow/examples
+      - name: Devin orchestrator compiles
+        run: python3 -m py_compile .devin/skills/autonomous-workflow/workflow.py
