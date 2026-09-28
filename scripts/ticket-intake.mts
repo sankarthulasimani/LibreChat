@@ -128,14 +128,42 @@ export function readyQuery(config: TicketConfig, project: string): string {
   );
 }
 
+/**
+ * Organization URL and project name. Either value may be pasted as any Azure DevOps URL
+ * (project, board or repo page); `https://dev.azure.com/<org>/<project>/...` and
+ * `https://<org>.visualstudio.com/<project>/...` are understood.
+ */
+export function adoLocation(
+  org: string | undefined,
+  project: string | undefined,
+): { orgUrl?: string; project?: string } {
+  const parse = (value: string) => {
+    const url = new URL(value);
+    const segments = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+    const hosted = url.hostname === 'dev.azure.com';
+    const orgSegments = hosted ? segments.slice(0, 1) : [];
+    const orgPath = orgSegments.map(encodeURIComponent).join('/');
+    return {
+      orgUrl: `${url.origin}${orgPath ? `/${orgPath}` : ''}`,
+      project: segments[orgSegments.length],
+    };
+  };
+  const fromOrg =
+    org && /^https?:\/\//.test(org) ? parse(org) : { orgUrl: org, project: undefined };
+  const fromProject = project && /^https?:\/\//.test(project) ? parse(project) : null;
+  return {
+    orgUrl: fromOrg.orgUrl ?? fromProject?.orgUrl,
+    project: fromProject ? fromProject.project : project || fromOrg.project,
+  };
+}
+
 export function azureDevOps(
   config: TicketConfig,
   env: Record<string, string | undefined> = process.env,
   fetcher: Fetch = fetch,
 ): TicketSource {
   const ado = config.azure_devops;
-  const orgUrl = env[ado.org_url_env]?.replace(/\/+$/, '');
-  const project = env[ado.project_env];
+  const { orgUrl, project } = adoLocation(env[ado.org_url_env], env[ado.project_env]);
   const pat = env[ado.pat_env];
   const missing = [
     [ado.org_url_env, orgUrl],

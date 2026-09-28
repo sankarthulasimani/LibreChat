@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import type { Ticket, TicketConfig } from './ticket-intake.mts';
 
 import {
+  adoLocation,
   azureDevOps,
   htmlToText,
   loadTicketConfig,
@@ -163,4 +164,20 @@ test('report moves the item and links the pull request', async () => {
   ]);
   const comment = calls.find((call) => call.url.includes('/comments'));
   assert.deepEqual(comment?.body, { text: 'Done.\n\nPull request: https://github.com/o/r/pull/3' });
+});
+
+test('organization and project are read from pasted Azure DevOps URLs', () => {
+  const repoUrl = 'https://dev.azure.com/contoso/My%20Project/_git/web';
+  assert.deepEqual(adoLocation(repoUrl, repoUrl), {
+    orgUrl: 'https://dev.azure.com/contoso',
+    project: 'My Project',
+  });
+  assert.deepEqual(adoLocation('https://dev.azure.com/contoso/', 'Chat'), {
+    orgUrl: 'https://dev.azure.com/contoso',
+    project: 'Chat',
+  });
+  assert.deepEqual(adoLocation('https://contoso.visualstudio.com/Chat/_boards', undefined), {
+    orgUrl: 'https://contoso.visualstudio.com',
+    project: 'Chat',
+  });
 });
