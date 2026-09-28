@@ -21,6 +21,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'api-version=7.1';
 
 export type Outcome = 'review' | 'blocked';
+export type Phase = 'ready' | 'in_progress' | Outcome;
 
 export interface TicketConfig {
   provider: 'azure_devops';
@@ -39,7 +40,11 @@ export interface TicketConfig {
       repro_steps: string;
     };
   };
-  states: { ready: string; in_progress: string; review: string; blocked: string };
+  /** `state`: markers are System.State values. `tag`: markers are tags, exactly one at a time. */
+  trigger: 'state' | 'tag';
+  markers: Record<Phase, string>;
+  /** Tag trigger only: optional System.State to set per work item type as a ticket moves. */
+  state_moves: Record<string, Partial<Record<Exclude<Phase, 'ready'>, string>>>;
   tag: string;
 }
 
@@ -50,6 +55,7 @@ export interface Ticket {
   type: string;
   title: string;
   url: string;
+  state: string;
   description: string;
   acceptance_criteria: string;
   tags: string[];
@@ -113,10 +119,41 @@ export function htmlToText(html: string): string {
 
 const wiqlString = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
+export function isReady(ticket: Pick<Ticket, 'state' | 'tags'>, config: TicketConfig): boolean {
+  const ready = config.markers.ready;
+  return config.trigger === 'state'
+    ? ticket.state === ready
+    : ticket.tags.some((tag) => tag.toLowerCase() === ready.toLowerCase());
+}
+
+/** JSON-patch operations that move a ticket to `to` in the configured lifecycle. */
+export function movePatch(
+  ticket: Pick<Ticket, 'type' | 'tags'>,
+  to: Exclude<Phase, 'ready'>,
+  config: TicketConfig,
+): object[] {
+  const tags = new Set(ticket.tags);
+  tags.add(config.tag);
+  const ops: object[] = [];
+  if (config.trigger === 'state') {
+    ops.push({ op: 'add', path: '/fields/System.State', value: config.markers[to] });
+  } else {
+    const markers = Object.values(config.markers).map((marker) => marker.toLowerCase());
+    for (const tag of tags) if (markers.includes(tag.toLowerCase())) tags.delete(tag);
+    tags.add(config.markers[to]);
+    const state = config.state_moves[ticket.type]?.[to];
+    if (state) ops.push({ op: 'add', path: '/fields/System.State', value: state });
+  }
+  ops.push({ op: 'add', path: '/fields/System.Tags', value: [...tags].join('; ') });
+  return ops;
+}
+
 export function readyQuery(config: TicketConfig, project: string): string {
   const clauses = [
     `[System.TeamProject] = ${wiqlString(project)}`,
-    `[System.State] = ${wiqlString(config.states.ready)}`,
+    config.trigger === 'state'
+      ? `[System.State] = ${wiqlString(config.markers.ready)}`
+      : `[System.Tags] CONTAINS ${wiqlString(config.markers.ready)}`,
     `[System.WorkItemType] IN (${config.azure_devops.work_item_types.map(wiqlString).join(', ')})`,
   ];
   if (config.azure_devops.area_path)
@@ -174,7 +211,8 @@ export function azureDevOps(
     .map(([name]) => name);
   if (missing.length > 0 || !orgUrl || !project || !pat)
     throw new Error(`missing environment: ${missing.join(', ')}`);
-  const base = `${orgUrl}/${encodeURIComponent(project)}/_apis/wit`;
+  const projectPath = encodeURIComponent(project);
+  const base = `${orgUrl}/${projectPath}/_apis/wit`;
   const auth = 'Basic ' + Buffer.from(`:${pat}`).toString('base64');
 
   async function call<T>(
@@ -205,6 +243,30 @@ export function azureDevOps(
       text,
     });
 
+  async function getTicket(id: number): Promise<Ticket> {
+    const item = await must<WorkItem>('GET', `${base}/workitems/${id}?${API}`);
+    const field = (name: string) => String(item.fields[name] ?? '');
+    const type = field('System.WorkItemType');
+    const description = htmlToText(
+      field(ado.fields.description) || (type === 'Bug' ? field(ado.fields.repro_steps) : ''),
+    );
+    return {
+      provider: 'azure_devops',
+      id: item.id,
+      rev: item.rev,
+      type,
+      state: field('System.State'),
+      title: field(ado.fields.title),
+      url: item._links?.html?.href ?? `${orgUrl}/${projectPath}/_workitems/edit/${id}`,
+      description,
+      acceptance_criteria: htmlToText(field(ado.fields.acceptance_criteria)),
+      tags: field('System.Tags')
+        .split(';')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    };
+  }
+
   return {
     async listReady() {
       const result = await must<{ workItems: { id: number }[] }>(
@@ -215,40 +277,12 @@ export function azureDevOps(
       return result.workItems.map((item) => item.id);
     },
 
-    async get(id) {
-      const item = await must<WorkItem>('GET', `${base}/workitems/${id}?${API}`);
-      const field = (name: string) => String(item.fields[name] ?? '');
-      const type = field('System.WorkItemType');
-      const description = htmlToText(
-        field(ado.fields.description) || (type === 'Bug' ? field(ado.fields.repro_steps) : ''),
-      );
-      return {
-        provider: 'azure_devops',
-        id: item.id,
-        rev: item.rev,
-        type,
-        title: field(ado.fields.title),
-        url:
-          item._links?.html?.href ??
-          `${orgUrl}/${encodeURIComponent(project)}/_workitems/edit/${id}`,
-        description,
-        acceptance_criteria: htmlToText(field(ado.fields.acceptance_criteria)),
-        tags: field('System.Tags')
-          .split(';')
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      };
-    },
+    get: getTicket,
 
     async claim(ticket, runId) {
       const patch = [
         { op: 'test', path: '/rev', value: ticket.rev },
-        { op: 'add', path: '/fields/System.State', value: config.states.in_progress },
-        {
-          op: 'add',
-          path: '/fields/System.Tags',
-          value: [...new Set([...ticket.tags, config.tag])].join('; '),
-        },
+        ...movePatch(ticket, 'in_progress', config),
       ];
       const result = await call<unknown>(
         'PATCH',
@@ -257,8 +291,7 @@ export function azureDevOps(
         'application/json-patch+json',
       );
       if (!result.ok) {
-        const current = await must<WorkItem>('GET', `${base}/workitems/${ticket.id}?${API}`);
-        if (current.fields['System.State'] !== config.states.ready) return false;
+        if (!isReady(await getTicket(ticket.id), config)) return false;
         throw new Error(`claim #${ticket.id} -> ${result.status}: ${JSON.stringify(result.value)}`);
       }
       await comment(
@@ -269,9 +302,7 @@ export function azureDevOps(
     },
 
     async report(id, outcome, message, prUrl) {
-      const patch: object[] = [
-        { op: 'add', path: '/fields/System.State', value: config.states[outcome] },
-      ];
+      const patch = movePatch(await getTicket(id), outcome, config);
       if (prUrl)
         patch.push({
           op: 'add',
@@ -328,6 +359,7 @@ export async function next(
 ): Promise<Task | null> {
   for (const id of await source.listReady()) {
     const ticket = await source.get(id);
+    if (!isReady(ticket, config)) continue;
     const task = toTask(ticket, config);
     if (dryRun || (await source.claim(ticket, task.run_id))) return task;
   }

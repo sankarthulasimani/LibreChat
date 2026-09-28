@@ -15,11 +15,13 @@
       "repro_steps": "Microsoft.VSTS.TCM.ReproSteps"
     }
   },
-  "states": {
+  "trigger": "tag",
+  "markers": {
     "ready": "AI_Ready",
     "in_progress": "AI_In_Progress",
     "review": "AI_Review",
     "blocked": "AI_Blocked"
   },
+  "state_moves": {},
   "tag": "software-factory"
 }
