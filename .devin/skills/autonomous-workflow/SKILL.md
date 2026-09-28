@@ -15,7 +15,11 @@ child Devin session, and `workflow.py` re-runs every gate locally with
 1. **Load Node 24** (`.nvmrc`): `source ~/.nvm/nvm.sh && nvm use` and confirm
    `node scripts/agent-workflow.mts check-policy` passes on the checked-out commit. The
    children read the role docs from the base branch, so the workflow must be merged there.
-2. **Pick the run id** `YYYYMMDD-<slug>` and write `.agents/runs/task.json`:
+2. **From a ticket** (the scheduled Software Factory automation): run
+   `node scripts/ticket-intake.mts next`. `{"ticket": null}` means nothing is `AI_Ready`: stop
+   without starting a workflow. Otherwise it claimed the item and wrote `.agents/runs/task.json`;
+   skip to step 4 without asking for confirmation (the ticket state is the approval). Otherwise,
+   **pick the run id** `YYYYMMDD-<slug>` and write `.agents/runs/task.json`:
    ```json
    {"run_id": "20260928-tag-limit", "repo": "sankarthulasimani/LibreChat", "base": "main",
     "task": "<the full request, including any decisions the user already made>", "open_pr": true}

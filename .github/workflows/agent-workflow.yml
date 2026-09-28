@@ -7,6 +7,8 @@ on:
       - '.devin/skills/autonomous-workflow/**'
       - 'scripts/agent-workflow.mts'
       - 'scripts/agent-workflow.test.mts'
+      - 'scripts/ticket-intake.mts'
+      - 'scripts/ticket-intake.test.mts'
       - '.github/workflows/agent-workflow.yml'
 
 permissions:
@@ -29,7 +31,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
       - name: Gate unit tests
-        run: node --test scripts/agent-workflow.test.mts
+        run: node --test scripts/agent-workflow.test.mts scripts/ticket-intake.test.mts
       - name: Policy, contracts and example run
         run: node scripts/agent-workflow.mts check-policy
       - name: Example run passes every stage gate

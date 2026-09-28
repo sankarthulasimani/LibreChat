@@ -7,6 +7,9 @@ with scripts/agent-workflow.mts, trusting only its own result.
 Input: .agents/runs/task.json
   {"run_id": "20260928-tag-limit", "repo": "sankarthulasimani/LibreChat",
    "base": "main", "task": "<request>", "open_pr": true}
+Tasks written by scripts/ticket-intake.mts also carry
+  "ticket": {"provider": "azure_devops", "id": 42, "url": "...", "title": "..."}
+and the outcome (PR link, or the escalation reason) is reported back to that ticket.
 """
 
 import asyncio
@@ -122,6 +125,20 @@ def gate(*args: str) -> tuple[bool, str]:
     STATE["gates"].append({"args": list(args), "passed": result.returncode == 0})
     save_state()
     return result.returncode == 0, output
+
+
+def report_ticket(outcome: str, message: str, pr_url: str | None = None) -> None:
+    ticket = TASK.get("ticket")
+    if not ticket:
+        return
+    args = [node_bin(), "scripts/ticket-intake.mts", "report", str(ticket["id"]), "--outcome", outcome,
+            "--message", message]
+    if pr_url:
+        args += ["--pr-url", pr_url]
+    result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+    save_state(ticket_report={"outcome": outcome, "reported": result.returncode == 0})
+    if result.returncode != 0:
+        log(f"could not update ticket #{ticket['id']}: {(result.stdout + result.stderr).strip()}")
 
 
 def fetch_branch() -> None:
@@ -437,6 +454,13 @@ async def main():
             else:
                 save_state(status="done")
                 log(f"DONE: {shipped['pr_url']} (CI passing)")
+            criteria = "\n".join(f"- {c['id']}: {c['then']}" for c in design["acceptance_criteria"])
+            report_ticket(
+                "review",
+                f"Software Factory run `{RUN_ID}` passed Design, Architect, Dev and Test (verified head "
+                f"`{test['head_sha']}`); CI is {shipped['ci_status']}. Acceptance criteria verified:\n{criteria}",
+                shipped["pr_url"],
+            )
         else:
             save_state(status="done")
             log(f"DONE without PR: branch {BRANCH} at {test['head_sha']}")
@@ -445,7 +469,17 @@ async def main():
     except Escalation as reason:
         save_state(status="escalated", escalation=str(reason))
         log(f"ESCALATE: {reason}")
+        report_ticket(
+            "blocked",
+            f"Software Factory run `{RUN_ID}` needs a human (state `{STATE.get('state')}`):\n\n{reason}\n\n"
+            f"Answer on this ticket and move it back to the ready state to start a new run.",
+            STATE.get("pr_url"),
+        )
         raise RuntimeError(f"Run {RUN_ID} escalated to a human: {reason}") from None
+    except Exception as error:
+        save_state(status="failed", error=str(error))
+        report_ticket("blocked", f"Software Factory run `{RUN_ID}` failed unexpectedly: {error}", STATE.get("pr_url"))
+        raise
 
 
 asyncio.run(main())

@@ -74,6 +74,29 @@ npm run test:agent-workflow
 Start a run with Devin via the `autonomous-workflow` skill (`.devin/skills/autonomous-workflow`),
 or with Claude Code via `/autonomous-workflow`.
 
+## Ticket intake (Azure DevOps)
+
+A scheduled Devin automation turns work items into runs, so a ticket moved to `AI_Ready` ends
+as a PR without anyone starting a session:
+
+```text
+AI_Ready --claim--> AI_In_Progress --Design/Architect/Dev/Test/Ship--> AI_Review  (PR linked + comment)
+                                    \--escalation or failure-----------> AI_Blocked (reason + questions)
+```
+
+- `tickets.json` maps the tracker to this repo: states, work item types, optional area path,
+  rich-text fields and the tag added on claim. `ADO_ORG_URL`, `ADO_PROJECT` and `ADO_PAT`
+  (Work Items read & write) come from Devin secrets.
+- `node scripts/ticket-intake.mts next` picks the highest-priority, oldest ready item, claims it
+  with a rev-guarded patch (a second poller loses the race and skips it), and writes
+  `.agents/runs/task.json` with the title, description, acceptance criteria and ticket link.
+  `--dry-run` shows the next item without claiming it.
+- `workflow.py` reports back through `ticket-intake.mts report`: `review` with the PR link and
+  verified criteria, or `blocked` with the escalation reason (blocking design questions,
+  exhausted loops, failing CI). Answer on the ticket and move it back to `AI_Ready` to rerun.
+- The four states must exist in the work item type's workflow (Organization settings → Process);
+  rename them in `tickets.json` to reuse existing states.
+
 ## Changing the workflow
 
 Edit `policy.json`, a contract or a role doc in a normal PR, update `examples/` if a contract
