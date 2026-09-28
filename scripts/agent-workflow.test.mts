@@ -173,6 +173,33 @@ test('the test verdict must match the evidence and the tested head', () => {
   assert.deepEqual(rules(checkTest(stale, design, plan, devReports, policy)), ['head-mismatch']);
 });
 
+test('a plan that sends the design back is valid without planning details', () => {
+  const review = clone(plan);
+  review.design_review.verdict = 'revise';
+  review.design_review.scores[0].score = 0;
+  review.design_review.required_changes = ['state the empty-composer behavior'];
+  review.work_packages = [];
+  assert.deepEqual(rules(checkPlan(review, design, policy)), []);
+  review.design_review.required_changes = [];
+  assert.ok(rules(checkPlan(review, design, policy)).length > 0);
+});
+
+test('a check that did not run blocks a passing verdict', () => {
+  const unrun = clone(testReport);
+  unrun.checks[0].result = 'not_run';
+  unrun.checks[0].note = 'no browser available';
+  assert.deepEqual(rules(checkTest(unrun, design, plan, devReports, policy)), ['test-verdict']);
+});
+
+test('a test report on its own test commits is pinned through baseline_head_sha', () => {
+  const extended = clone(testReport);
+  extended.baseline_head_sha = extended.head_sha;
+  extended.head_sha = 'abcdef1234567';
+  assert.deepEqual(rules(checkTest(extended, design, plan, devReports, policy)), []);
+  extended.baseline_head_sha = devReports[0].head_sha;
+  assert.deepEqual(rules(checkTest(extended, design, plan, devReports, policy)), ['head-mismatch']);
+});
+
 test('diff rules flag added lines only in matching files', () => {
   const diff = [
     'diff --git a/client/src/A.tsx b/client/src/A.tsx',

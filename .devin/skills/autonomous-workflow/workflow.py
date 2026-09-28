@@ -57,8 +57,13 @@ HANDOFF_SCHEMA = {
 }
 SHIP_SCHEMA = {
     "type": "object",
-    "properties": {"pr_url": {"type": "string"}, "ci_status": {"type": "string"}},
-    "required": ["pr_url", "ci_status"],
+    "properties": {
+        "pr_url": {"type": "string"},
+        "head_sha": {"type": "string", "description": "The PR head commit CI ran on"},
+        "ci_status": {"type": "string", "enum": ["passing", "failing", "pending"]},
+        "failing_jobs": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["pr_url", "head_sha", "ci_status", "failing_jobs"],
 }
 TIME_LIMITS = {"design": 20, "architect": 30, "dev": 60, "test": 45, "ship": 20}
 
@@ -120,7 +125,25 @@ def gate(*args: str) -> tuple[bool, str]:
 
 
 def fetch_branch() -> None:
-    subprocess.run(["git", "fetch", "origin", BASE, BRANCH], cwd=ROOT, capture_output=True, text=True, check=True)
+    subprocess.run(["git", "fetch", "origin", BASE], cwd=ROOT, capture_output=True, text=True, check=True)
+    subprocess.run(["git", "fetch", "origin", BRANCH], cwd=ROOT, capture_output=True, text=True)
+
+
+def branch_head() -> str:
+    """The pushed head of the run branch, or the base head before the branch exists."""
+    fetch_branch()
+    for ref in (f"origin/{BRANCH}", f"origin/{BASE}"):
+        result = subprocess.run(["git", "rev-parse", ref], cwd=ROOT, capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout.strip()
+    raise RuntimeError(f"neither origin/{BRANCH} nor origin/{BASE} resolves")
+
+
+def archive_dev_reports(round_tag: str) -> None:
+    history = RUN_DIR / "history"
+    history.mkdir(parents=True, exist_ok=True)
+    for report in RUN_DIR.glob("dev-report.*.json"):
+        shutil.move(str(report), history / f"{report.stem}.{round_tag}.json")
 
 
 def describe(stage: str) -> str:
@@ -244,16 +267,20 @@ async def architect(design: dict, feedback: list[str], round_index: int) -> dict
     return await produce(
         "architect", "architecture-plan.json", {"design-brief.json": design},
         "Write only the architecture plan (and CONTEXT.md terms if needed). Score the design honestly in "
-        "`design_review`; if you return `revise`, still produce a schema-valid plan.",
+        "`design_review`. If you return `revise`, list the required changes and stop planning: the rest of the "
+        "artifact only needs to be schema-valid.",
         feedback, f"architect-r{round_index}", f"r{round_index}",
     )
 
 
-def dev_gate(wp_id: str):
+def dev_gate(wp_id: str, start_sha: str):
+    """Package scope on this package's own commits; stage scope and diff rules on the whole branch."""
     def check(report: dict):
         fetch_branch()
-        return gate("guard", "dev", "--against", f"origin/{BASE}", "--head", report["head_sha"],
-                    "--run", str(RUN_DIR), "--work-package", wp_id)
+        ok, package_output = gate("guard", "dev", "--against", start_sha, "--head", report["head_sha"],
+                                  "--run", str(RUN_DIR), "--work-package", wp_id)
+        branch_ok, branch_output = gate("guard", "dev", "--against", f"origin/{BASE}", "--head", report["head_sha"])
+        return ok and branch_ok, package_output + "\n" + branch_output
     return check
 
 
@@ -269,9 +296,11 @@ async def develop(design: dict, plan: dict, wp: dict, fix_round: int, findings: 
     )
     if findings:
         instructions += " Address exactly these test findings and list them in `findings_addressed`:\n" + dumps(findings)
+    start_sha = branch_head()
+    instructions += f" Start from `{start_sha}`; the orchestrator guards `{start_sha}..<your head>` against the package scope."
     return await produce(
         "dev", f"dev-report.{wp['id']}.json", upstream, instructions, [],
-        f"dev-{wp['id']}-r{fix_round}", f"r{fix_round}", extra_gate=dev_gate(wp["id"]),
+        f"dev-{wp['id']}-r{fix_round}", f"r{fix_round}", extra_gate=dev_gate(wp["id"], start_sha),
     )
 
 
@@ -291,6 +320,7 @@ async def implement_all(design: dict, plan: dict) -> tuple[dict, dict]:
         if plan_round == LIMITS["plan_revisions"]:
             break
         transition("ARCHITECT", "plan_review = revise")
+        archive_dev_reports(f"plan-r{plan_round}")
         plan = await architect(design, rejected, plan_round + 1)
         if plan["design_review"]["verdict"] != "accept":
             raise Escalation("architect rejected the design during a plan revision")
@@ -299,23 +329,41 @@ async def implement_all(design: dict, plan: dict) -> tuple[dict, dict]:
 
 def test_gate(report: dict):
     fetch_branch()
-    return gate("guard", "test", "--against", report["head_sha"], "--head", f"origin/{BRANCH}", "--run", str(RUN_DIR))
+    dev_head = report.get("baseline_head_sha") or report["head_sha"]
+    return gate("guard", "test", "--against", dev_head, "--head", f"origin/{BRANCH}", "--run", str(RUN_DIR))
 
 
 async def verify(design: dict, plan: dict, reports: dict) -> dict:
     previous = None
+    confirm: str | None = None
     for fix_round in range(LIMITS["fix_rounds"] + 1):
-        transition("TEST", f"round {fix_round}")
+        transition("TEST", f"round {fix_round}" + (" (confirming test commits)" if confirm else ""))
         upstream = {"design-brief.json": design, "architecture-plan.json": plan}
         upstream.update({f"dev-report.{key}.json": value for key, value in reports.items()})
         latest = max(reports.values(), key=lambda item: item["round"])
+        if confirm:
+            instructions = (
+                f"Verify commit `{confirm}` of `{BRANCH}`: dev head `{latest['head_sha']}` plus the test-only commits "
+                f"added by the previous Test round. Record `head_sha: {confirm}` and "
+                f"`baseline_head_sha: {latest['head_sha']}`. Run every check, including the added tests. Do not push."
+            )
+        else:
+            instructions = (
+                f"Verify commit `{latest['head_sha']}` of `{BRANCH}`; record it as `head_sha`. Push only test files."
+            )
         test = await produce(
-            "test", "test-report.json", upstream,
-            f"Verify commit `{latest['head_sha']}` of `{BRANCH}`; record it as `head_sha`. Push only test files.",
+            "test", "test-report.json", upstream, instructions,
             [], f"test-r{fix_round}", f"r{fix_round}", extra_gate=test_gate,
         )
         if test["verdict"] == "pass":
-            return test
+            pushed = branch_head()
+            if pushed.startswith(test["head_sha"]) or test["head_sha"].startswith(pushed):
+                return test
+            if fix_round == LIMITS["fix_rounds"]:
+                break
+            confirm = pushed
+            continue
+        confirm = None
         signature = sorted(finding["description"] for finding in test["findings"])
         if signature == previous:
             raise Escalation("the same findings survived a fix round: " + "; ".join(signature))
@@ -351,7 +399,8 @@ async def ship(design: dict, plan: dict, test: dict) -> dict:
         "Use `.github/pull_request_template.md`. Describe the change from this summary, including a table of acceptance "
         "criteria and their verification, and list non-blocking findings under a 'Follow-ups' heading:\n"
         + dumps(summary)
-        + "\nDo not change any code. Wait for CI; report the PR URL and `ci_status` (passing, failing: <jobs>, or pending).",
+        + "\nDo not change any code. Wait until every CI check on the PR head finishes (up to your time limit); "
+        "report the PR URL, the PR `head_sha`, `ci_status` (passing, failing or pending) and `failing_jobs`.",
         phase="ship", label="ship", schema=SHIP_SCHEMA, repos=[REPO],
         soft_time_limit_minutes=TIME_LIMITS["ship"],
     )
@@ -377,8 +426,17 @@ async def main():
         test = await verify(design, plan, reports)
         if TASK.get("open_pr", True):
             shipped = await ship(design, plan, test)
-            save_state(status="done", pr_url=shipped["pr_url"], ci_status=shipped["ci_status"])
-            log(f"DONE: {shipped['pr_url']} (CI: {shipped['ci_status']})")
+            save_state(pr_url=shipped["pr_url"], ci_status=shipped["ci_status"], failing_jobs=shipped["failing_jobs"])
+            if not test["head_sha"].startswith(shipped["head_sha"]) and not shipped["head_sha"].startswith(test["head_sha"]):
+                raise Escalation(f"PR head {shipped['head_sha']} is not the verified head {test['head_sha']}")
+            if shipped["ci_status"] == "failing":
+                raise Escalation(f"CI failing on {shipped['pr_url']}: {', '.join(shipped['failing_jobs'])}")
+            if shipped["ci_status"] == "pending":
+                save_state(status="awaiting_ci")
+                log(f"PR open, CI still pending: {shipped['pr_url']}")
+            else:
+                save_state(status="done")
+                log(f"DONE: {shipped['pr_url']} (CI passing)")
         else:
             save_state(status="done")
             log(f"DONE without PR: branch {BRANCH} at {test['head_sha']}")

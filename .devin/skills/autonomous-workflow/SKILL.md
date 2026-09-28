@@ -26,11 +26,13 @@ child Devin session, and `workflow.py` re-runs every gate locally with
    `loop_limits` revision/fix rounds, all separate-VM child sessions billed to their ACUs.
 4. **Run** `run_workflow` with `workflow_name: "librechat-autonomous-delivery"` and
    `script_path` set to the absolute path of `.devin/skills/autonomous-workflow/workflow.py`.
-   Resume an interrupted run with the same `run_id` from the tool result.
+   Resume an interrupted run through `run_workflow`'s own resume (the workflow run id from the
+   tool result), which replays completed child sessions. Restarting the script with the same
+   `task.json` starts over from Design; use a new `run_id` for a fresh attempt.
 5. **On escalation** (the run fails with `escalated to a human`), read
    `.agents/runs/<run-id>/state.json`, ask the user the blocking questions or show the
    unresolved findings, add their answers to `task.json > task`, and start a new run.
-6. **On success**, report the PR URL, CI status and any non-blocking findings. Run
+6. **On `awaiting_ci`** (PR open, CI still pending) watch the PR checks; on success, report the PR URL, CI status and any non-blocking findings. Run
    `node scripts/agent-workflow.mts validate all --run .agents/runs/<run-id>` once more and
    include its result.
 

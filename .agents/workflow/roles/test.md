@@ -33,7 +33,9 @@ product code.
    finding, no check failed, and the implementation review is `accept`. Findings carry a location,
    the criterion and a reproduction.
 9. Commit added tests (hooks on), push, write `test-report.json` and self-gate. The report's
-   `head_sha` stays the dev head it verified; tests you add are verified in the next round.
+   `head_sha` stays the dev head it verified. If you pushed tests, the orchestrator runs a
+   confirmation round on the new head, recorded as `head_sha` with the dev head as
+   `baseline_head_sha`; a run ships only when the verified head is the pushed head.
 
 ## Output
 

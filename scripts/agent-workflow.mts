@@ -173,6 +173,7 @@ export interface DevReport {
 export interface TestReport {
   run_id: string;
   head_sha: string;
+  baseline_head_sha?: string;
   implementation_review: Review;
   verdict: 'pass' | 'fail';
   criteria_results: {
@@ -426,11 +427,9 @@ export function checkPlan(plan: ArchitecturePlan, design: DesignBrief, policy: P
   const issues = checkReview(plan.design_review, 'design', policy);
   if (plan.design_review.verdict === 'revise') {
     issues.push(
-      error(
-        'design-rejected',
-        'the plan asked the design to be revised; return to the Design stage',
-      ),
+      warn('design-rejected', 'the plan asks the design to be revised; return to the Design stage'),
     );
+    return issues;
   }
   if (plan.run_id !== design.run_id) {
     issues.push(
@@ -715,15 +714,12 @@ export function checkTest(
     issues.push(error('run-id', `test report run_id ${report.run_id} does not match the design`));
   const latest = latestDevReport(devReports, plan);
   if (!latest) issues.push(error('dev-missing', 'no dev report to verify'));
-  if (
-    latest &&
-    !latest.head_sha.startsWith(report.head_sha) &&
-    !report.head_sha.startsWith(latest.head_sha)
-  ) {
+  const devHead = report.baseline_head_sha ?? report.head_sha;
+  if (latest && !latest.head_sha.startsWith(devHead) && !devHead.startsWith(latest.head_sha)) {
     issues.push(
       error(
         'head-mismatch',
-        `tested ${report.head_sha} but the latest dev head is ${latest.head_sha}`,
+        `tested dev head ${devHead} but the latest dev head is ${latest.head_sha}`,
       ),
     );
   }
@@ -749,9 +745,9 @@ export function checkTest(
   }
   const allPass = designIds.every((id) => results.get(id)?.status === 'pass');
   const blocking = report.findings.some((finding) => finding.severity !== 'minor');
-  const failedCheck = report.checks.some((check) => check.result === 'fail');
+  const incompleteCheck = report.checks.some((check) => check.result !== 'pass');
   const expected =
-    allPass && !blocking && !failedCheck && report.implementation_review.verdict === 'accept'
+    allPass && !blocking && !incompleteCheck && report.implementation_review.verdict === 'accept'
       ? 'pass'
       : 'fail';
   if (report.verdict !== expected) {
@@ -1220,10 +1216,13 @@ function main(args: string[]): number {
       ? loadArtifact<ArchitecturePlan>(planFile, loadContract('architect', policy))
       : undefined;
     const only = option(args, '--work-package');
-    const packages =
-      plan && plan.issues.length === 0
-        ? plan.value.work_packages.filter((wp) => !only || wp.id === only)
-        : [];
+    let packages: WorkPackage[] = [];
+    if (only) {
+      if (!plan || plan.issues.length > 0)
+        throw new Error('--work-package needs --run <dir> with a valid architecture plan');
+      packages = plan.value.work_packages.filter((wp) => wp.id === only);
+      if (packages.length === 0) throw new Error(`${only} is not a work package of the plan`);
+    }
     const issues = [
       ...checkPaths(files, stage, policy, stage === 'dev' ? packages : []),
       ...scanAddedLines(added, policy.diff_rules),
@@ -1233,7 +1232,7 @@ function main(args: string[]): number {
       : 0;
   }
   console.log(
-    'usage: agent-workflow.mts <describe|validate|guard|eval-scenario|check-policy> [stage|all|scenario] [--run dir] [--against ref] [--head ref] [--work-package WP-n]',
+    'usage: agent-workflow.mts <describe|validate|guard|eval-scenario|check-policy> [stage|all|scenario] [--run dir] [--against ref] [--head ref] [--work-package WP-n]\n  guard dev without --work-package checks the stage scope of the whole range; with it, only that package (use --against <package start>)',
   );
   return command ? 1 : 0;
 }

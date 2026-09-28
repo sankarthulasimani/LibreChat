@@ -13,6 +13,11 @@
       "type": "string",
       "pattern": "^[0-9a-f]{7,40}$"
     },
+    "baseline_head_sha": {
+      "type": "string",
+      "description": "Set when head_sha includes the Test stage's own test-only commits: the latest dev head those commits sit on.",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
     "implementation_review": {
       "type": "object",
       "additionalProperties": false,
